@@ -1,6 +1,6 @@
 #![allow(dead_code)]
 
-use soroban_sdk::{contracterror, contracttype, Address, String};
+use soroban_sdk::{contracterror, contracttype, Address, String, Vec};
 
 /// Factory state containing administrative configuration
 ///
@@ -183,4 +183,22 @@ pub enum Error {
     InvalidBurnAmount = 12,
     BurnAmountExceedsBalance = 13,
     ContractPaused = 14,
+    EmptyBatchMint = 15,
+    InvalidMintAmount = 16,
+    SupplyOverflow = 17,
+    BatchMintFailed = 18,
+}
+
+/// Mint recipient for batch minting operations
+///
+/// Represents a single recipient in a batch mint operation.
+///
+/// # Fields
+/// * `recipient` - Address to receive minted tokens
+/// * `amount` - Amount of tokens to mint (must be positive)
+#[contracttype]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct MintRecipient {
+    pub recipient: Address,
+    pub amount: i128,
 }

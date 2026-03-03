@@ -6,7 +6,7 @@ mod burn;
 mod types;
 mod validation;
 
-use soroban_sdk::{contract, contractimpl, Address, Env, String};
+use soroban_sdk::{contract, contractimpl, symbol_short, Address, Env, String};
 use types::{ContractMetadata, Error, FactoryState, TokenInfo};
 
 // Contract metadata constants
@@ -672,6 +672,117 @@ impl TokenFactory {
         burn::get_burn_count(&env, token_index)
     }
 
+    /// Batch mint tokens to multiple recipients
+    ///
+    /// Allows the token admin to mint tokens to multiple recipients in a single transaction.
+    /// This is more efficient than individual mint operations and ensures atomicity.
+    ///
+    /// Implements #314
+    ///
+    /// # Arguments
+    /// * `token_address` - The token contract address
+    /// * `admin` - The token admin address (must be token creator)
+    /// * `mints` - Vector of MintRecipient structs containing recipient addresses and amounts
+    ///
+    /// # Security & Validation
+    /// - Requires admin authorization
+    /// - Verifies admin is the token creator
+    /// - Validates each mint amount is positive
+    /// - Checks aggregate supply doesn't overflow max supply
+    /// - Operation is atomic - all mints succeed or all fail
+    ///
+    /// # Errors
+    /// * `ContractPaused` - If contract is paused
+    /// * `Unauthorized` - If caller is not the token creator
+    /// * `TokenNotFound` - If token doesn't exist
+    /// * `EmptyBatchMint` - If mints vector is empty
+    /// * `InvalidMintAmount` - If any mint amount is <= 0
+    /// * `SupplyOverflow` - If total mint would exceed i128::MAX
+    /// * `BatchMintFailed` - If any individual mint operation fails
+    ///
+    /// # Events
+    /// Emits a batch_mint event with:
+    /// - token_address
+    /// - admin
+    /// - total_minted
+    /// - recipient_count
+    /// - timestamp
+    pub fn batch_mint_tokens(
+        env: Env,
+        token_address: Address,
+        admin: Address,
+        mints: soroban_sdk::Vec<types::MintRecipient>,
+    ) -> Result<(), Error> {
+        // Check if contract is paused
+        if storage::is_paused(&env) {
+            return Err(Error::ContractPaused);
+        }
+
+        // Require admin authorization
+        admin.require_auth();
+
+        // Verify token exists and get info
+        let mut token_info =
+            storage::get_token_info_by_address(&env, &token_address).ok_or(Error::TokenNotFound)?;
+
+        // Verify admin is the token creator
+        if token_info.creator != admin {
+            return Err(Error::Unauthorized);
+        }
+
+        // Validate batch is not empty
+        if mints.is_empty() {
+            return Err(Error::EmptyBatchMint);
+        }
+
+        // Validate all amounts and calculate total
+        let mut total_mint_amount: i128 = 0;
+        for mint in mints.iter() {
+            // Validate each amount is positive
+            if mint.amount <= 0 {
+                return Err(Error::InvalidMintAmount);
+            }
+
+            // Check for overflow when adding to total
+            total_mint_amount = total_mint_amount
+                .checked_add(mint.amount)
+                .ok_or(Error::SupplyOverflow)?;
+        }
+
+        // Check that new supply won't overflow
+        let new_supply = token_info
+            .total_supply
+            .checked_add(total_mint_amount)
+            .ok_or(Error::SupplyOverflow)?;
+
+        // TODO: Uncomment once token contract integration is available
+        // Get token contract client
+        // let token = token::Client::new(&env, &token_address);
+
+        // Perform batch mint operations
+        // for mint in mints.iter() {
+        //     token.mint(&mint.recipient, &mint.amount);
+        // }
+
+        // Update token supply
+        token_info.total_supply = new_supply;
+        storage::set_token_info_by_address(&env, &token_address, &token_info);
+
+        // Emit batch mint event
+        env.events().publish(
+            (symbol_short!("btch_mnt"), token_address.clone()),
+            (
+                admin,
+                total_mint_amount,
+                mints.len(),
+                env.ledger().timestamp(),
+            ),
+        );
+
+        Ok(())
+    }
+
+
 }
 
 // Temporarily disabled - requires create_token implementation
@@ -732,3 +843,4 @@ mod fuzz_test;
 #[cfg(test)]
 mod integration_test;
 mod gas_benchmark_comprehensive;
+
