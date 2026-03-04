@@ -1002,6 +1002,43 @@ impl TokenFactory {
     pub fn get_burn_count(env: Env, token_index: u32) -> u32 {
         burn::get_burn_count(&env, token_index)
     }
+
+    /// Admin-initiated burn from any holder's balance
+    ///
+    /// Allows the admin to burn tokens from any holder's address.
+    /// This is a privileged operation that requires admin authentication.
+    ///
+    /// # Arguments
+    /// * `env` - The contract environment
+    /// * `admin` - Admin address (must authorize and match stored admin)
+    /// * `token_index` - Index of the token to burn
+    /// * `holder` - Address holding the tokens to burn
+    /// * `amount` - Amount to burn (must be > 0 and <= holder's balance)
+    ///
+    /// # Returns
+    /// Returns `Ok(())` on success
+    ///
+    /// # Errors
+    /// * `Error::Unauthorized` - Caller is not the admin
+    /// * `Error::TokenNotFound` - Token index is invalid
+    /// * `Error::InvalidParameters` - Amount is zero or negative
+    /// * `Error::InsufficientBalance` - Holder balance is less than amount
+    /// * `Error::ArithmeticError` - Numeric overflow/underflow
+    ///
+    /// # Examples
+    /// ```
+    /// // Admin burns 1000 tokens from a holder
+    /// factory.admin_burn(&env, admin, 0, holder, 1_000_0000000)?;
+    /// ```
+    pub fn admin_burn(
+        env: Env,
+        admin: Address,
+        token_index: u32,
+        holder: Address,
+        amount: i128,
+    ) -> Result<(), Error> {
+        burn::admin_burn(&env, admin, token_index, holder, amount)
+    }
     /// Set metadata URI for a token (one-time only)
     ///
     /// Allows the token creator to set an IPFS metadata URI for their token.
