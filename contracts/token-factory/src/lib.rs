@@ -531,6 +531,72 @@ impl TokenFactory {
         storage::get_token_info_by_address(&env, &token_address).ok_or(Error::TokenNotFound)
     }
 
+    /// Create a new token
+    ///
+    /// # Arguments
+    /// * `creator` - Address that will own the token
+    /// * `name` - Token name
+    /// * `symbol` - Token symbol
+    /// * `decimals` - Number of decimal places
+    /// * `initial_supply` - Initial token supply
+    /// * `fee_payment` - Fee amount (must be >= base_fee)
+    ///
+    /// # Errors
+    /// * `Error::ContractPaused` - Contract is paused
+    /// * `Error::InvalidParameters` - Invalid inputs
+    /// * `Error::InsufficientFee` - Fee too low
+    pub fn create_token(
+        env: Env,
+        creator: Address,
+        name: String,
+        symbol: String,
+        decimals: u32,
+        initial_supply: i128,
+        fee_payment: i128,
+    ) -> Result<Address, Error> {
+        creator.require_auth();
+
+        if storage::is_paused(&env) {
+            return Err(Error::ContractPaused);
+        }
+
+        if initial_supply < 0 || decimals > 18 || name.len() == 0 || symbol.len() == 0 {
+            return Err(Error::InvalidParameters);
+        }
+
+        let base_fee = storage::get_base_fee(&env);
+        if fee_payment < base_fee {
+            return Err(Error::InsufficientFee);
+        }
+
+        let token_address = Address::generate(&env);
+        let info = TokenInfo {
+            address: token_address.clone(),
+            creator: creator.clone(),
+            name: name.clone(),
+            symbol: symbol.clone(),
+            decimals,
+            total_supply: initial_supply,
+            initial_supply,
+            metadata_uri: None,
+            created_at: env.ledger().timestamp(),
+            total_burned: 0,
+            burn_count: 0,
+            clawback_enabled: false,
+        };
+
+        let index = storage::increment_token_count(&env);
+        storage::set_token_info(&env, index, &info);
+        storage::set_token_info_by_address(&env, &token_address, &info);
+
+        env.events().publish(
+            (soroban_sdk::symbol_short!("created"),),
+            (token_address.clone(), creator, name, symbol, decimals, initial_supply)
+        );
+
+        Ok(token_address)
+    }
+
     /// Toggle clawback capability for a token (creator only)
     ///
     /// Allows the token creator to enable or disable clawback functionality.
