@@ -304,7 +304,6 @@ mod tests {
         let creator1 = Address::generate(&env);
         let creator2 = Address::generate(&env);
         
-        // Create tokens for creator1
         for i in 0..10 {
             let token_info = TokenInfo {
                 address: Address::generate(&env),
@@ -314,6 +313,7 @@ mod tests {
                 decimals: 7,
                 total_supply: 1_000_000,
                 initial_supply: 1_000_000,
+                max_supply: None,
                 total_burned: 0,
                 burn_count: 0,
                 metadata_uri: None,
@@ -334,6 +334,7 @@ mod tests {
                 decimals: 7,
                 total_supply: 2_000_000,
                 initial_supply: 2_000_000,
+                max_supply: None,
                 total_burned: 0,
                 burn_count: 0,
                 metadata_uri: None,
