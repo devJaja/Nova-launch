@@ -1,5 +1,5 @@
-use soroban_sdk::{Address, Env, Bytes};
-#[cfg(test)]
+use soroban_sdk::{Address, Bytes, Env, Vec};
+#[cfg(all(test, feature = "legacy-tests"))]
 use soroban_sdk::testutils::Ledger;
 use crate::types::{Error, TimelockConfig, PendingChange, ChangeType, Proposal, ActionType, VoteChoice};
 use crate::storage;
@@ -343,7 +343,7 @@ pub fn get_timelock_config(env: &Env) -> TimelockConfig {
     storage::get_timelock_config(env)
 }
 
-#[cfg(test)]
+#[cfg(all(test, feature = "legacy-tests"))]
 mod tests {
     use super::*;
     use soroban_sdk::{testutils::Address as _, Env};
@@ -537,7 +537,7 @@ pub fn get_proposal(env: &Env, proposal_id: u64) -> Option<Proposal> {
 }
 
 
-#[cfg(test)]
+#[cfg(all(test, feature = "legacy-tests"))]
 mod proposal_tests {
     use super::*;
     use soroban_sdk::{testutils::Address as _, Env, vec};

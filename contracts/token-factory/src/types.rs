@@ -1,6 +1,6 @@
 #![allow(dead_code)]
 
-use soroban_sdk::{contracterror, contracttype, Address, String, Vec, Bytes};
+use soroban_sdk::{contracterror, contracttype, Address, Bytes, String, Vec};
 
 /// Factory state containing administrative configuration
 ///
@@ -112,6 +112,17 @@ pub struct TokenStats {
     pub has_clawback: bool,
     pub clawback_enabled: bool,
     pub freeze_enabled: bool,
+}
+
+/// Parameters for token creation in single/batch flows.
+#[contracttype]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct TokenCreationParams {
+    pub name: String,
+    pub symbol: String,
+    pub decimals: u32,
+    pub initial_supply: i128,
+    pub metadata_uri: Option<String>,
 }
 
 /// Batch fee update structure for Phase 2 optimization
@@ -502,4 +513,3 @@ pub struct TimelockConfig {
     pub delay_seconds: u64,
     pub enabled: bool,
 }
-
