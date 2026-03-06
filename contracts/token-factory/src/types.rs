@@ -1,6 +1,6 @@
 #![allow(dead_code)]
 
-use soroban_sdk::{contracterror, contracttype, Address, String, Vec};
+use soroban_sdk::{contracterror, contracttype, Address, Bytes, String, Vec};
 
 /// Factory state containing administrative configuration
 ///
@@ -85,6 +85,7 @@ pub struct TokenInfo {
     pub metadata_uri: Option<String>,
     pub created_at: u64,
     pub is_paused: bool,
+    pub clawback_enabled: bool,
 }
 
 /// Compact read-only snapshot of a token's current state.
@@ -97,6 +98,19 @@ pub struct TokenStats {
     pub burn_count: u32,
     pub is_paused: bool,
     pub has_clawback: bool,
+    pub clawback_enabled: bool,
+    pub freeze_enabled: bool,
+}
+
+/// Parameters for token creation in single/batch flows.
+#[contracttype]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct TokenCreationParams {
+    pub name: String,
+    pub symbol: String,
+    pub decimals: u32,
+    pub initial_supply: i128,
+    pub metadata_uri: Option<String>,
 }
 
 /// Batch fee update structure for Phase 2 optimization
@@ -144,6 +158,8 @@ pub struct FeeUpdate {
 /// * `NextChangeId` - Next available change ID
 /// * `CreatorTokens(Address)` - Vector of token indices for a creator
 /// * `CreatorTokenCount(Address)` - Number of tokens created by address
+/// * `TokenStreams(u32)` - Vector of stream IDs for a token
+/// * `TokenStreamCount(u32)` - Number of streams for a token
 /// * `TreasuryPolicy` - Treasury withdrawal policy
 /// * `WithdrawalPeriod` - Current withdrawal period tracking
 /// * `AllowedRecipient(Address)` - Whether address is allowed recipient
@@ -173,6 +189,8 @@ pub enum DataKey {
     NextChangeId,
     CreatorTokens(Address),
     CreatorTokenCount(Address),
+    TokenStreams(u32),
+    TokenStreamCount(u32),
     TreasuryPolicy,
     WithdrawalPeriod,
     AllowedRecipient(Address),
@@ -180,10 +198,11 @@ pub enum DataKey {
     StreamCount,                    // Total number of streams created
     Stream(u64),                    // Stream info by ID (using u64 for consistency)
     NextStreamId,                   // Next available stream ID
-    // Governance snapshot keys
-    VoteSnapshot(u64),              // Vote snapshot by ID
-    VoterWeight(u64, Address),      // Voter weight (snapshot_id, voter)
-    NextSnapshotId,                 // Next available snapshot ID
+    // Governance proposal keys
+    ProposalCount,                  // Total number of proposals created
+    Proposal(u64),                  // Proposal by ID
+    NextProposalId,                 // Next available proposal ID
+    ProposalVote(u64, Address),     // Vote by proposal ID and voter address
 }
 
 /// Contract error codes
@@ -253,6 +272,8 @@ pub enum Error {
     StreamNotFound = 29,
     StreamCancelled = 30,
     NothingToClaim = 31,
+    CliffNotReached = 32,
+    InvalidSchedule = 33,  // Invalid time schedule (cliff outside valid bounds)
 }
 
 /// Type of pending change
@@ -264,6 +285,62 @@ pub enum ChangeType {
     FeeUpdate,
     PauseUpdate,
     TreasuryUpdate,
+}
+
+/// Type of governance action
+///
+/// Identifies the type of action proposed in a governance proposal.
+#[contracttype]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub enum ActionType {
+    FeeChange,
+    TreasuryChange,
+    PauseContract,
+    UnpauseContract,
+    PolicyUpdate,
+}
+
+/// Vote choice for a proposal
+///
+/// Represents the voter's position on a proposal.
+#[contracttype]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub enum VoteChoice {
+    For,
+    Against,
+    Abstain,
+}
+
+/// Governance proposal
+///
+/// Represents a proposal for a governance action with voting period.
+///
+/// # Fields
+/// * `id` - Unique proposal identifier
+/// * `proposer` - Address that created the proposal
+/// * `action_type` - Type of action being proposed
+/// * `payload` - Encoded action payload (bounded to 1024 bytes)
+/// * `start_time` - Voting start timestamp
+/// * `end_time` - Voting end timestamp
+/// * `eta` - Estimated time of execution after approval
+/// * `created_at` - Timestamp when proposal was created
+/// * `votes_for` - Number of votes in favor
+/// * `votes_against` - Number of votes against
+/// * `votes_abstain` - Number of abstain votes
+#[contracttype]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct Proposal {
+    pub id: u64,
+    pub proposer: Address,
+    pub action_type: ActionType,
+    pub payload: Bytes,
+    pub start_time: u64,
+    pub end_time: u64,
+    pub eta: u64,
+    pub created_at: u64,
+    pub votes_for: u32,
+    pub votes_against: u32,
+    pub votes_abstain: u32,
 }
 
 /// Pending change awaiting timelock expiry
@@ -317,7 +394,7 @@ pub struct PaginationCursor {
 /// # Fields
 /// * `tokens` - Vector of token info for this page
 /// * `cursor` - Cursor for next page (None = no more results)
-// NOTE: Cannot be #[contracttype] because Option<PaginationCursor> is not serializable
+#[contracttype]
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct PaginatedTokens {
     pub tokens: soroban_sdk::Vec<TokenInfo>,
@@ -382,6 +459,7 @@ pub struct StreamInfo {
     pub end_time: u64,
     pub cliff_time: u64,
     pub cancelled: bool,
+    pub paused: bool,
 }
 
 /// Stream creation parameters
@@ -419,97 +497,3 @@ pub struct TimelockConfig {
     pub delay_seconds: u64,
     pub enabled: bool,
 }
-
-/// Type of governance proposal action
-///
-/// Defines the type of parameter or policy change being proposed.
-#[contracttype]
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub enum ProposalActionType {
-    FeeUpdate,
-    PauseToggle,
-    TreasuryUpdate,
-    PolicyUpdate,
-}
-
-/// Governance proposal for contract-level changes
-///
-/// Represents a proposal for updating contract parameters or policies.
-///
-/// # Fields
-/// * `id` - Unique proposal identifier
-/// * `proposer` - Address that created the proposal
-/// * `action_type` - Type of action being proposed
-/// * `payload_hash` - Hash of the proposal payload for verification
-/// * `created_at` - Timestamp when proposal was created
-/// * `start_time` - Timestamp when voting starts
-/// * `end_time` - Timestamp when voting ends
-/// * `eta` - Estimated time of execution (after timelock)
-/// * `executed` - Whether the proposal has been executed
-/// * `cancelled` - Whether the proposal has been cancelled
-/// * `snapshot_id` - ID of the vote weight snapshot for this proposal
-#[contracttype]
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub struct GovernanceProposal {
-    pub id: u64,
-    pub proposer: Address,
-    pub action_type: ProposalActionType,
-    pub payload_hash: soroban_sdk::BytesN<32>,
-    pub created_at: u64,
-    pub start_time: u64,
-    pub end_time: u64,
-    pub eta: u64,
-    pub executed: bool,
-    pub cancelled: bool,
-    pub snapshot_id: u64,
-}
-
-/// Vote weight snapshot strategy
-///
-/// Defines how voting power is calculated at snapshot time.
-#[contracttype]
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub enum VoteWeightStrategy {
-    /// One address = one vote (simple democracy)
-    OneAddressOneVote,
-    /// Voting power based on token balance at snapshot
-    TokenBalance,
-}
-
-/// Vote weight snapshot
-///
-/// Records voting power for all participants at a specific point in time.
-/// Prevents manipulation of voting power during active voting period.
-///
-/// # Fields
-/// * `id` - Unique snapshot identifier
-/// * `proposal_id` - Associated proposal ID
-/// * `timestamp` - When snapshot was taken (typically proposal start_time)
-/// * `strategy` - Vote weight calculation strategy used
-/// * `total_weight` - Total voting power in this snapshot
-#[contracttype]
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub struct VoteSnapshot {
-    pub id: u64,
-    pub proposal_id: u64,
-    pub timestamp: u64,
-    pub strategy: VoteWeightStrategy,
-    pub total_weight: i128,
-}
-
-/// Individual voter's weight in a snapshot
-///
-/// Records a single voter's power at snapshot time.
-///
-/// # Fields
-/// * `snapshot_id` - Associated snapshot ID
-/// * `voter` - Address of the voter
-/// * `weight` - Voting power (1 for OneAddressOneVote, balance for TokenBalance)
-#[contracttype]
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub struct VoterWeight {
-    pub snapshot_id: u64,
-    pub voter: Address,
-    pub weight: i128,
-}
-
