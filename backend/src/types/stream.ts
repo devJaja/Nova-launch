@@ -31,7 +31,17 @@ export interface StreamCancelledEvent {
   timestamp: Date;
 }
 
-export type StreamEventUnion = StreamCreatedEvent | StreamClaimedEvent | StreamCancelledEvent;
+export interface StreamMetadataUpdatedEvent {
+  type: 'metadata_updated';
+  streamId: number;
+  updater: string;
+  hasMetadata: boolean;
+  metadata?: string;
+  txHash: string;
+  timestamp: Date;
+}
+
+export type StreamEventUnion = StreamCreatedEvent | StreamClaimedEvent | StreamCancelledEvent | StreamMetadataUpdatedEvent;
 
 export enum StreamStatus {
   CREATED = 'CREATED',

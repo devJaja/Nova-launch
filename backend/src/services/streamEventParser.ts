@@ -1,5 +1,5 @@
 import { PrismaClient, StreamStatus } from '@prisma/client';
-import { StreamCreatedEvent, StreamClaimedEvent, StreamCancelledEvent } from '../types/stream';
+import { StreamCreatedEvent, StreamClaimedEvent, StreamCancelledEvent, StreamMetadataUpdatedEvent } from '../types/stream';
 
 export class StreamEventParser {
   constructor(private prisma: PrismaClient) {}
@@ -39,7 +39,20 @@ export class StreamEventParser {
     });
   }
 
-  async parseEvent(event: StreamCreatedEvent | StreamClaimedEvent | StreamCancelledEvent): Promise<void> {
+  async parseMetadataUpdatedEvent(event: StreamMetadataUpdatedEvent): Promise<void> {
+    // Update stream metadata while preserving financial terms
+    // Financial terms (amount, creator, recipient) are immutable and not updated
+    await this.prisma.stream.update({
+      where: { streamId: event.streamId },
+      data: {
+        metadata: event.metadata || null,
+      },
+    });
+  }
+
+  async parseEvent(
+    event: StreamCreatedEvent | StreamClaimedEvent | StreamCancelledEvent | StreamMetadataUpdatedEvent
+  ): Promise<void> {
     switch (event.type) {
       case 'created':
         await this.parseCreatedEvent(event);
@@ -49,6 +62,9 @@ export class StreamEventParser {
         break;
       case 'cancelled':
         await this.parseCancelledEvent(event);
+        break;
+      case 'metadata_updated':
+        await this.parseMetadataUpdatedEvent(event);
         break;
     }
   }

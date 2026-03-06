@@ -47,7 +47,7 @@
 /// 
 /// Any schema changes require creating a new version (e.g., init_v2).
 
-use soroban_sdk::{symbol_short, Address, Env};
+use soroban_sdk::{symbol_short, Address, Env, String};
 
 /// Emit initialized event (v1)
 /// 
@@ -92,6 +92,37 @@ pub fn emit_token_registered(env: &Env, token_address: &Address, creator: &Addre
     env.events().publish(
         (symbol_short!("tok_rg_v1"), token_address.clone()),
         (creator,),
+    );
+}
+
+/// Emit token created event with full details
+/// 
+/// **Event Name**: tok_crt
+/// 
+/// **Topics** (indexed):
+/// - Event name: "tok_crt"
+/// - token_address: Address - The newly created token's address
+/// 
+/// **Payload** (non-indexed):
+/// - creator: Address - The token creator
+/// - name: String - Token name
+/// - symbol: String - Token symbol
+/// - decimals: u32 - Decimal places
+/// - initial_supply: i128 - Initial token supply
+/// 
+/// Emitted when a new token is created with full metadata
+pub fn emit_token_created(
+    env: &Env,
+    token_address: &Address,
+    creator: &Address,
+    name: &String,
+    symbol: &String,
+    decimals: u32,
+    initial_supply: i128,
+) {
+    env.events().publish(
+        (symbol_short!("tok_crt"), token_address.clone()),
+        (creator.clone(), name.clone(), symbol.clone(), decimals, initial_supply),
     );
 }
 
@@ -270,7 +301,7 @@ pub fn emit_timelock_configured(env: &Env, delay_seconds: u64) {
 /// Emit change scheduled event
 ///
 /// Emitted when a sensitive change is scheduled with timelock
-pub fn emit_change_scheduled(env: &Env, change_id: u64, change_type: &crate::types::ChangeType, execute_at: u64) {
+pub fn emit_change_scheduled(env: &Env, change_id: u64, change_type: crate::types::ChangeType, execute_at: u64) {
     env.events().publish(
         (symbol_short!("ch_sched"), change_id),
         (change_type, execute_at),
@@ -280,7 +311,7 @@ pub fn emit_change_scheduled(env: &Env, change_id: u64, change_type: &crate::typ
 /// Emit change executed event
 ///
 /// Emitted when a pending change is successfully executed
-pub fn emit_change_executed(env: &Env, change_id: u64, change_type: &crate::types::ChangeType) {
+pub fn emit_change_executed(env: &Env, change_id: u64, change_type: crate::types::ChangeType) {
     env.events().publish(
         (symbol_short!("ch_exec"), change_id),
         (change_type,),
@@ -290,7 +321,7 @@ pub fn emit_change_executed(env: &Env, change_id: u64, change_type: &crate::type
 /// Emit change cancelled event
 ///
 /// Emitted when a pending change is cancelled before execution
-pub fn emit_change_cancelled(env: &Env, change_id: u64, change_type: &crate::types::ChangeType) {
+pub fn emit_change_cancelled(env: &Env, change_id: u64, change_type: crate::types::ChangeType) {
     env.events().publish(
         (symbol_short!("ch_cncl"), change_id),
         (change_type,),
@@ -358,5 +389,216 @@ pub fn emit_treasury_policy_updated(env: &Env, daily_cap: i128, allowlist_enable
     env.events().publish(
         (symbol_short!("trs_pol"),),
         (daily_cap, allowlist_enabled),
+    );
+}
+
+/// Emit stream metadata updated event (v1)
+/// 
+/// **Schema Version**: 1
+/// **Event Name**: strm_md
+/// 
+/// **Topics** (indexed):
+/// - Event name: "strm_md"
+/// - stream_id: u32 - The stream ID being updated
+/// 
+/// **Payload** (non-indexed):
+/// - updater: Address - The address that updated the metadata (creator/admin)
+/// - has_metadata: bool - Whether metadata is now present (true) or cleared (false)
+/// 
+/// **Schema Stability**: This schema is immutable. Any changes require a new version.
+/// 
+/// Emitted when stream metadata is successfully updated
+pub fn emit_stream_metadata_updated(
+    env: &Env,
+    stream_id: u32,
+    updater: &Address,
+    has_metadata: bool,
+) {
+    env.events().publish(
+        (symbol_short!("strm_md"), stream_id),
+        (updater, has_metadata),
+    );
+}
+
+/// Emit stream created event (v1)
+/// 
+/// **Schema Version**: 1
+/// **Event Name**: strm_crt
+/// 
+/// **Topics** (indexed):
+/// - Event name: "strm_crt"
+/// - stream_id: u32 - The newly created stream ID
+/// 
+/// **Payload** (non-indexed):
+/// - creator: Address - The stream creator
+/// - recipient: Address - The stream recipient
+/// - amount: i128 - The stream amount
+/// - has_metadata: bool - Whether metadata is present
+/// 
+/// **Schema Stability**: This schema is immutable. Any changes require a new version.
+/// 
+/// Emitted when a new stream is created
+pub fn emit_stream_created(
+    env: &Env,
+    stream_id: u32,
+    creator: &Address,
+    recipient: &Address,
+    amount: i128,
+    has_metadata: bool,
+) {
+    env.events().publish(
+        (symbol_short!("strm_crt"), stream_id),
+        (creator, recipient, amount, has_metadata),
+    );
+}
+
+
+/// Emit metadata set event
+/// 
+/// **Event Name**: meta_set
+/// 
+/// **Topics** (indexed):
+/// - Event name: "meta_set"
+/// - token_address: Address - The token address
+/// 
+/// **Payload** (non-indexed):
+/// - admin: Address - The admin who set the metadata
+/// - metadata_uri: String - The metadata URI
+/// 
+/// Emitted when token metadata is set
+pub fn emit_metadata_set(
+    env: &Env,
+    token_address: &Address,
+    admin: &Address,
+    metadata_uri: &String,
+) {
+    env.events().publish(
+        (symbol_short!("meta_set"), token_address.clone()),
+        (admin.clone(), metadata_uri.clone()),
+    );
+}
+
+/// Emit stream created event
+///
+/// Published when a new payment stream is created
+pub fn emit_stream_created(
+    env: &Env,
+    stream_id: u64,
+    creator: &Address,
+    recipient: &Address,
+    amount: i128,
+) {
+    env.events().publish(
+        (symbol_short!("strm_cr"),),
+        (stream_id, creator, recipient, amount),
+    );
+}
+
+/// Emit batch streams created event
+///
+/// Published when multiple streams are created in a batch
+pub fn emit_batch_streams_created(
+    env: &Env,
+    creator: &Address,
+    count: u32,
+) {
+    env.events().publish(
+        (symbol_short!("bch_strm"),),
+        (creator, count),
+    );
+}
+
+/// Emit stream claimed event
+///
+/// Published when tokens are claimed from a stream
+pub fn emit_stream_claimed(
+    env: &Env,
+    stream_id: u64,
+    recipient: &Address,
+    amount: i128,
+) {
+    env.events().publish(
+        (symbol_short!("strm_clm"),),
+        (stream_id, recipient, amount),
+    );
+}
+
+/// Emit stream cancelled event
+///
+/// Published when a stream is cancelled by creator
+pub fn emit_stream_cancelled(
+    env: &Env,
+    stream_id: u64,
+    creator: &Address,
+) {
+    env.events().publish(
+        (symbol_short!("strm_cnl"),),
+        (stream_id, creator),
+    );
+}
+
+
+// ── Governance events ─────────────────────────────────────────
+
+/// Emit proposal created event (v1)
+/// 
+/// **Schema Version**: 1
+/// **Event Name**: prop_crt
+/// 
+/// **Topics** (indexed):
+/// - Event name: "prop_crt"
+/// - proposal_id: u64 - The newly created proposal ID
+/// 
+/// **Payload** (non-indexed):
+/// - proposer: Address - The address that created the proposal
+/// - action_type: ActionType - The type of action being proposed
+/// - start_time: u64 - Voting start timestamp
+/// - end_time: u64 - Voting end timestamp
+/// - eta: u64 - Estimated execution time
+/// 
+/// **Schema Stability**: This schema is immutable. Any changes require a new version.
+/// 
+/// Emitted when a new governance proposal is created
+pub fn emit_proposal_created(
+    env: &Env,
+    proposal_id: u64,
+    proposer: &Address,
+    action_type: crate::types::ActionType,
+    start_time: u64,
+    end_time: u64,
+    eta: u64,
+) {
+    env.events().publish(
+        (symbol_short!("prop_crt"), proposal_id),
+        (proposer, action_type, start_time, end_time, eta),
+    );
+}
+
+
+/// Emit proposal voted event (v1)
+/// 
+/// **Schema Version**: 1
+/// **Event Name**: prop_vot
+/// 
+/// **Topics** (indexed):
+/// - Event name: "prop_vot"
+/// - proposal_id: u64 - The proposal being voted on
+/// 
+/// **Payload** (non-indexed):
+/// - voter: Address - The address that cast the vote
+/// - vote_choice: VoteChoice - The vote choice (For, Against, Abstain)
+/// 
+/// **Schema Stability**: This schema is immutable. Any changes require a new version.
+/// 
+/// Emitted when a vote is cast on a governance proposal
+pub fn emit_proposal_voted(
+    env: &Env,
+    proposal_id: u64,
+    voter: &Address,
+    vote_choice: crate::types::VoteChoice,
+) {
+    env.events().publish(
+        (symbol_short!("prop_vot"), proposal_id),
+        (voter, vote_choice),
     );
 }
