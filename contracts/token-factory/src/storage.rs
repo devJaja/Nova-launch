@@ -1,6 +1,6 @@
 use soroban_sdk::{Address, Env};
 
-use crate::types::{DataKey, Error, FactoryState, TokenInfo};
+use crate::types::{BuybackCampaign, DataKey, Error, FactoryState, TokenInfo};
 
 // ============================================================
 // Storage Functions - Burn Tracking

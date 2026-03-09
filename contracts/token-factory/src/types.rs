@@ -184,6 +184,20 @@ pub struct TokenStats {
     pub freeze_enabled: bool,
 }
 
+/// Buyback campaign configuration and state
+#[contracttype]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct BuybackCampaign {
+    pub token_index: u32,
+    pub total_budget: i128,
+    pub total_spent: i128,
+    pub total_bought: i128,
+    pub total_burned: i128,
+    pub max_spend_per_step: i128,
+    pub execution_count: u32,
+    pub active: bool,
+}
+
 /// Batch fee update structure for Phase 2 optimization
 ///
 /// Allows updating both fees in a single operation, providing
@@ -321,6 +335,13 @@ pub enum Error {
     InvalidBudget = 52,
     InsufficientBudget = 53,
 }
+
+// Buyback error code mapping (reusing existing errors):
+// - CampaignNotFound -> TokenNotFound (4)
+// - CampaignInactive -> ContractPaused (14)  
+// - BudgetExhausted -> InsufficientFee (1)
+// - SlippageExceeded -> InvalidAmount (10)
+// - InvalidBuybackParams -> InvalidParameters (3)
 
 /// Type of pending change
 ///
