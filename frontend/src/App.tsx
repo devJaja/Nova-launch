@@ -125,10 +125,6 @@ function App() {
 
   return (
     <ErrorBoundary>
-      <a href="#main-content" className="skip-to-main">
-        Skip to main content
-      </a>
-
       <Suspense fallback={<PageLoader />}>
         <div id="main-content" tabIndex={-1}>
           {page}
